@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <integer name="vibrationtime">100</integer>
+    <integer name="discoverytimeout">4000</integer>
+    <integer name="readtimeout">10000</integer>
+    <bool name="useexternalstorageifpossible">true</bool>
+
+</resources>
