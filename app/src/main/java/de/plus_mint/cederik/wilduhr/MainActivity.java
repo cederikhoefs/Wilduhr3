@@ -1,65 +1,10 @@
 package de.plus_mint.cederik.wilduhr;
 
 import android.Manifest;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
-import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattService;
-import android.bluetooth.BluetoothManager;
-import android.bluetooth.BluetoothProfile;
-import android.bluetooth.le.BluetoothLeScanner;
-import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanFilter;
-import android.bluetooth.le.ScanResult;
-import android.bluetooth.le.ScanSettings;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
-import android.os.AsyncTask;
-import android.os.Build;
-import android.os.Environment;
-import android.os.VibrationEffect;
-import android.os.Vibrator;
-import android.support.v4.app.ActivityCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
-import android.text.method.ScrollingMovementMethod;
-import android.util.Log;
-import android.view.View;
-import android.widget.Button;
-import android.widget.ImageButton;
-import android.widget.ImageView;
-import android.widget.NumberPicker;
-import android.widget.ProgressBar;
-import android.widget.TextView;
-import android.widget.Toast;
-
-import java.io.File;
-import java.io.FileWriter;
-import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
-import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.BluetoothLeScanner;
@@ -69,51 +14,38 @@ import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.net.Uri;
+import android.location.LocationManager;
 import android.os.AsyncTask;
-import android.os.Build;
-import android.os.Environment;
-import android.os.VibrationEffect;
-import android.os.Vibrator;
-import android.support.v4.app.ActivityCompat;
-import android.support.v7.app.AppCompatActivity;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.os.Bundle;
-import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.Button;
-import android.widget.ImageButton;
-import android.widget.ImageView;
-import android.widget.NumberPicker;
-import android.widget.ProgressBar;
+import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.BaseAdapter;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.sql.Time;
-import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
 
     private final UUID HM10_CUSTOM_SERVICE = new UUID(0x0000ffe000001000L, 0x800000805f9b34fbL);
     private final UUID HM10_DATA_CHARACTERISTIC = new UUID(0x0000ffe100001000L, 0x800000805f9b34fbL);
 
+    LocationManager locationManager;
 
     BluetoothManager bluetoothManager;
     BluetoothAdapter bluetoothAdapter;
@@ -123,7 +55,13 @@ public class MainActivity extends AppCompatActivity {
 
     private Map<String, ScanResult> ScanResults;
 
+    ArrayList<BluetoothDevice> BluetoothDevices;
+
     BluetoothDevice Wilduhr;
+
+    boolean checkBT(){
+        return bluetoothAdapter.isEnabled() && locationManager.isLocationEnabled();
+    }
 
     boolean initBT(){
 
@@ -170,7 +108,6 @@ public class MainActivity extends AppCompatActivity {
                         }
                         catch(InterruptedException e){}
 
-                        finish();
                         return;
 
                     }
@@ -184,7 +121,143 @@ public class MainActivity extends AppCompatActivity {
 
         while(!bluetoothAdapter.isEnabled());
 
+        //return initLocation();
         return true;
+
+    }
+
+    boolean initLocation() {
+
+        Log.d("initLocation", "got called...");
+
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
+        if(!locationManager.isLocationEnabled()) {
+            Log.d("initLocation", "Location is not enabled...");
+            buildAlertMessageNoGps();
+        }
+
+        return true;
+    }
+
+    void buildAlertMessageNoGps() {
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage("Standortzugriff ist für BLE zwingend notwendig.")
+                .setCancelable(false)
+                .setPositiveButton("Zulassen", new DialogInterface.OnClickListener() {
+                    public void onClick(final DialogInterface dialog, final int id) {
+                        startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                    }
+                })
+                .setNegativeButton("Nicht zulassen", new DialogInterface.OnClickListener() {
+                    public void onClick(final DialogInterface dialog, final int id) {
+                        dialog.cancel();
+                    }
+                });
+        final AlertDialog alert = builder.create();
+        alert.show();
+    }
+
+
+    SwipeRefreshLayout scansrl;
+    ListView devicelist;
+
+
+    void initUI(){
+        scansrl = (SwipeRefreshLayout)findViewById(R.id.swiperefresh);
+        devicelist = (ListView)findViewById(R.id.devicelist);
+
+        /*
+        devicelist.setAdapter(new ArrayAdapter<String>(this, R.layout.devicelistentry, eintrag));
+
+        devicelist.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+           @Override
+           public void onItemClick(AdapterView<?> parent, View view,
+                                   int position, long id) {
+               Toast.makeText(getApplicationContext(),
+                       "Click ListItem Number " + position, Toast.LENGTH_LONG)
+                       .show();
+           }
+       });
+       */
+        BluetoothDevices = new ArrayList<BluetoothDevice>(Arrays.asList(bluetoothAdapter.getRemoteDevice("11:22:33:44:55:66")));
+        devicelist.setAdapter(new BluetoothDeviceAdapter(BluetoothDevices, this));
+
+        devicelist.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            public void onItemClick(AdapterView parentView, View childView,
+                                       int position, long id)
+            {
+                Log.d("onItemClick", String.valueOf(position));
+                BluetoothDevices.add(bluetoothAdapter.getRemoteDevice("33:55:77:99:BB:DD"));
+                ((BaseAdapter)devicelist.getAdapter()).notifyDataSetChanged();
+            }
+
+        });
+
+
+    }
+
+    private class BluetoothDeviceAdapter extends BaseAdapter {
+
+        private Context context;
+        private ArrayList<BluetoothDevice> items;
+
+        private class ViewHolder {
+            TextView name;
+            TextView mac;
+        }
+
+        public BluetoothDeviceAdapter(ArrayList<BluetoothDevice> items, Context context) {
+            this.context = context;
+            this.items = items;
+
+        }
+
+        @Override
+        public int getCount() {
+            return items.size();
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return items.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+
+            ViewHolder viewholder;
+
+            if (convertView == null) {
+                viewholder = new ViewHolder();
+                convertView = getLayoutInflater().inflate(R.layout.devicelistentry, parent, false);
+
+                viewholder.name = (TextView) convertView.findViewById(R.id.name);
+                viewholder.mac = (TextView) convertView.findViewById(R.id.mac);
+
+                convertView.setTag(viewholder);
+            }
+            else{
+                viewholder = (ViewHolder)convertView.getTag();
+            }
+
+
+            BluetoothDevice device= (BluetoothDevice) getItem(position);
+
+            TextView name = (TextView) convertView.findViewById(R.id.name);
+            TextView mac = (TextView)convertView.findViewById(R.id.mac);
+
+            name.setText("Test");
+            mac.setText(device.getAddress());
+
+            // returns the view for the current row
+            return convertView;
+        }
 
     }
 
@@ -193,12 +266,26 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        initBT();
+        initUI();
+
+        /*
         if (!initBT()) {
 
             Toast.makeText(getApplicationContext(), "Bluetooth konnte nicht aktiviert werden oder wird nicht unterstützt...", Toast.LENGTH_SHORT).show();
-            finish();
 
         }
+
+        scansrl.setOnRefreshListener(
+                new SwipeRefreshLayout.OnRefreshListener() {
+                    @Override
+                    public void onRefresh() {
+                        updateDeviceList();
+                    }
+                }
+        );
+        */
+
 
     }
 
@@ -260,7 +347,6 @@ public class MainActivity extends AppCompatActivity {
                         }
                     });
                     return true;
-                    break;
 
                 }
 
