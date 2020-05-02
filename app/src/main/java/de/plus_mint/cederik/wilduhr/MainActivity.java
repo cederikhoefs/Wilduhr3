@@ -20,6 +20,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.AsyncTask;
+import android.support.constraint.ConstraintLayout;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.os.Bundle;
 import android.util.Log;
@@ -29,6 +30,7 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
+import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -59,23 +61,38 @@ public class MainActivity extends Activity {
 
     BluetoothDevice Wilduhr;
 
-    boolean checkBT(){
-        return bluetoothAdapter.isEnabled() && locationManager.isLocationEnabled();
+    SwipeRefreshLayout scansrl;
+    ListView devicelist;
+    ConstraintLayout bluetoothwarning;
+    TextView bluetoothdisabled;
+    Button enablebluetooth;
+
+    boolean isBluetoothEnabled(){
+        return BluetoothAdapter.getDefaultAdapter().isEnabled();
+    }
+
+    boolean isLocationEnabled(){
+        return ((LocationManager) getSystemService(Context.LOCATION_SERVICE)).isLocationEnabled();
+    }
+
+    boolean enableBluetooth(){
+        bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        bluetoothAdapter.enable();
+        return (bluetoothAdapter != null);
     }
 
     boolean initBT(){
 
         requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 100);
 
-        if(!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)){             //Gerät ist nicht BLE-fähig? Beenden!
+        if(!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)){
 
             return false;
 
         }
 
-        bluetoothManager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
-        bluetoothAdapter = bluetoothManager.getAdapter();
-
+        //bluetoothManager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
+        bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
 
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
@@ -93,23 +110,19 @@ public class MainActivity extends Activity {
 
                 if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
 
-                    if (bluetoothAdapter.getState() == BluetoothAdapter.STATE_TURNING_OFF) {
+                    switch(bluetoothAdapter.getState()){
 
-                        Toast.makeText(getApplicationContext(), "Sie sollten Bluetooth nicht ausschalten!", Toast.LENGTH_SHORT).show();
-                        return;
+                        case BluetoothAdapter.STATE_OFF:
+                            Toast.makeText(getApplicationContext(), "Bluetooth ist jetzt deaktiviert...", Toast.LENGTH_LONG).show();
+                            showBTWarning();
+                            break;
 
-                    }
+                        case BluetoothAdapter.STATE_ON:
+                            Toast.makeText(getApplicationContext(), "Bluetooth ist jetzt aktiviert...", Toast.LENGTH_LONG).show();
+                            break;
 
-                    if (bluetoothAdapter.getState() == BluetoothAdapter.STATE_OFF) {
-
-                        Toast.makeText(getApplicationContext(), "Diese Anwendung ist auf Bluetooth angewiesen!", Toast.LENGTH_LONG).show();
-                        try{
-                            Thread.sleep(1000);
-                        }
-                        catch(InterruptedException e){}
-
-                        return;
-
+                        default:
+                            break;
                     }
 
                 }
@@ -121,8 +134,7 @@ public class MainActivity extends Activity {
 
         while(!bluetoothAdapter.isEnabled());
 
-        //return initLocation();
-        return true;
+        return initLocation();
 
     }
 
@@ -158,28 +170,18 @@ public class MainActivity extends Activity {
         alert.show();
     }
 
-
-    SwipeRefreshLayout scansrl;
-    ListView devicelist;
-
+    void showBTWarning(){
+        bluetoothwarning.setVisibility(View.VISIBLE);
+    }
 
     void initUI(){
+
         scansrl = (SwipeRefreshLayout)findViewById(R.id.swiperefresh);
         devicelist = (ListView)findViewById(R.id.devicelist);
+        bluetoothwarning = (ConstraintLayout)findViewById(R.id.btwarning);
+        bluetoothdisabled = (Button)findViewById(R.id.enablebluetooth);
+        enablebluetooth = (Button)findViewById(R.id.enablebluetooth);
 
-        /*
-        devicelist.setAdapter(new ArrayAdapter<String>(this, R.layout.devicelistentry, eintrag));
-
-        devicelist.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-           @Override
-           public void onItemClick(AdapterView<?> parent, View view,
-                                   int position, long id) {
-               Toast.makeText(getApplicationContext(),
-                       "Click ListItem Number " + position, Toast.LENGTH_LONG)
-                       .show();
-           }
-       });
-       */
         BluetoothDevices = new ArrayList<BluetoothDevice>(Arrays.asList(bluetoothAdapter.getRemoteDevice("11:22:33:44:55:66")));
         devicelist.setAdapter(new BluetoothDeviceAdapter(BluetoothDevices, this));
 
@@ -192,6 +194,15 @@ public class MainActivity extends Activity {
                 ((BaseAdapter)devicelist.getAdapter()).notifyDataSetChanged();
             }
 
+        });
+
+        enablebluetooth.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Log.d("OnClick", "EnableBluetooth");
+                enableBluetooth();
+                bluetoothwarning.setVisibility(View.GONE);
+            }
         });
 
 
