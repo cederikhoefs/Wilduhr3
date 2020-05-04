@@ -20,23 +20,22 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.AsyncTask;
+import android.os.Handler;
 import android.support.constraint.ConstraintLayout;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,28 +43,33 @@ import java.util.UUID;
 
 public class MainActivity extends Activity {
 
-    private final UUID HM10_CUSTOM_SERVICE = new UUID(0x0000ffe000001000L, 0x800000805f9b34fbL);
-    private final UUID HM10_DATA_CHARACTERISTIC = new UUID(0x0000ffe100001000L, 0x800000805f9b34fbL);
+    SwipeRefreshLayout scansrl;
+    ListView devicelist;
+    ConstraintLayout bluetoothwarning;
+    TextView bluetoothdisabled;
+    Button enablebluetooth;
+    ProgressBar bluetoothenabling;
+    ConstraintLayout locationwarning;
+    TextView locationdisabled;
+    Button enablelocation;
+    Button doscan;
+    ProgressBar scanning;
+
 
     LocationManager locationManager;
 
     BluetoothManager bluetoothManager;
     BluetoothAdapter bluetoothAdapter;
     BluetoothLeScanner bluetoothLeScanner;
+    BLEScanCallback bluetoothScanCallback;
 
-    BroadcastReceiver BluetoothTurnOffReceiver;
+    BroadcastReceiver receiver;
 
     private Map<String, ScanResult> ScanResults;
 
     ArrayList<BluetoothDevice> BluetoothDevices;
 
     BluetoothDevice Wilduhr;
-
-    SwipeRefreshLayout scansrl;
-    ListView devicelist;
-    ConstraintLayout bluetoothwarning;
-    TextView bluetoothdisabled;
-    Button enablebluetooth;
 
     boolean isBluetoothEnabled(){
         return BluetoothAdapter.getDefaultAdapter().isEnabled();
@@ -102,50 +106,17 @@ public class MainActivity extends Activity {
 
         }
 
-        BluetoothTurnOffReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-
-                String action = intent.getAction();
-
-                if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
-
-                    switch(bluetoothAdapter.getState()){
-
-                        case BluetoothAdapter.STATE_OFF:
-                            Toast.makeText(getApplicationContext(), "Bluetooth ist jetzt deaktiviert...", Toast.LENGTH_LONG).show();
-                            showBTWarning();
-                            break;
-
-                        case BluetoothAdapter.STATE_ON:
-                            Toast.makeText(getApplicationContext(), "Bluetooth ist jetzt aktiviert...", Toast.LENGTH_LONG).show();
-                            break;
-
-                        default:
-                            break;
-                    }
-
-                }
-
-            }
-        };
-
-        this.registerReceiver(BluetoothTurnOffReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
-
         while(!bluetoothAdapter.isEnabled());
 
-        return initLocation();
+        return true;
 
     }
 
     boolean initLocation() {
 
-        Log.d("initLocation", "got called...");
-
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         if(!locationManager.isLocationEnabled()) {
-            Log.d("initLocation", "Location is not enabled...");
             buildAlertMessageNoGps();
         }
 
@@ -170,8 +141,85 @@ public class MainActivity extends Activity {
         alert.show();
     }
 
+    void initReceiver(){
+
+        receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+
+                String action = intent.getAction();
+
+                if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+
+                    switch(bluetoothAdapter.getState()){
+
+                        case BluetoothAdapter.STATE_OFF:
+                            onBluetoothDisabled();
+                            break;
+
+                        case BluetoothAdapter.STATE_ON:
+                            onBluetoothEnabled();
+                            break;
+
+                        default:
+                            break;
+                    }
+
+                }
+                else if(action.equals(LocationManager.PROVIDERS_CHANGED_ACTION)){
+                    if(isLocationEnabled()){
+                        onLocationEnabled();
+                    }
+                    else{
+                        onLocationDisabled();
+                    }
+                }
+
+            }
+        };
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
+        filter.addAction(LocationManager.PROVIDERS_CHANGED_ACTION);
+
+        this.registerReceiver(receiver, filter);
+    }
+
     void showBTWarning(){
         bluetoothwarning.setVisibility(View.VISIBLE);
+        enablebluetooth.setVisibility(View.VISIBLE);
+        bluetoothenabling.setVisibility(View.INVISIBLE);
+    }
+    void whileBTEnabling(){
+        enablebluetooth.setVisibility(View.INVISIBLE);
+        bluetoothenabling.setVisibility(View.VISIBLE);
+    }
+    void hideBTWarning(){
+        bluetoothwarning.setVisibility(View.GONE);
+    }
+
+    void showLocationWarning(){
+        locationwarning.setVisibility(View.VISIBLE);
+        enablelocation.setVisibility(View.VISIBLE);
+    }
+    void hideLocationWarning(){
+        locationwarning.setVisibility(View.GONE);
+    }
+
+    void onBluetoothDisabled(){
+        showBTWarning();
+    }
+
+    void onBluetoothEnabled(){
+        hideBTWarning();
+    }
+
+    void onLocationDisabled(){
+        showLocationWarning();
+    }
+
+    void onLocationEnabled(){
+        hideLocationWarning();
     }
 
     void initUI(){
@@ -179,19 +227,22 @@ public class MainActivity extends Activity {
         scansrl = (SwipeRefreshLayout)findViewById(R.id.swiperefresh);
         devicelist = (ListView)findViewById(R.id.devicelist);
         bluetoothwarning = (ConstraintLayout)findViewById(R.id.btwarning);
-        bluetoothdisabled = (Button)findViewById(R.id.enablebluetooth);
+        bluetoothdisabled = (TextView) findViewById(R.id.btdisabled);
         enablebluetooth = (Button)findViewById(R.id.enablebluetooth);
+        bluetoothenabling = (ProgressBar)findViewById(R.id.btenabling);
+        locationwarning = (ConstraintLayout)findViewById(R.id.locationwarning);
+        locationdisabled = (TextView) findViewById(R.id.locationdisabled);
+        enablelocation = (Button)findViewById(R.id.enablelocation);
+        doscan = (Button)findViewById(R.id.scan);
+        scanning = (ProgressBar)findViewById(R.id.scanning);
 
-        BluetoothDevices = new ArrayList<BluetoothDevice>(Arrays.asList(bluetoothAdapter.getRemoteDevice("11:22:33:44:55:66")));
-        devicelist.setAdapter(new BluetoothDeviceAdapter(BluetoothDevices, this));
+        devicelist.setAdapter(new BluetoothDeviceAdapter(new ArrayList<BluetoothDevice>(), this));
 
         devicelist.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             public void onItemClick(AdapterView parentView, View childView,
                                        int position, long id)
             {
                 Log.d("onItemClick", String.valueOf(position));
-                BluetoothDevices.add(bluetoothAdapter.getRemoteDevice("33:55:77:99:BB:DD"));
-                ((BaseAdapter)devicelist.getAdapter()).notifyDataSetChanged();
             }
 
         });
@@ -199,13 +250,69 @@ public class MainActivity extends Activity {
         enablebluetooth.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Log.d("OnClick", "EnableBluetooth");
                 enableBluetooth();
-                bluetoothwarning.setVisibility(View.GONE);
+                whileBTEnabling();
             }
         });
 
+        enablelocation.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                initLocation();
+            }
+        });
 
+        doscan.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                doscan.setVisibility(View.INVISIBLE);
+                scanning.setVisibility(View.VISIBLE);
+                (((BluetoothDeviceAdapter)devicelist.getAdapter())).items = new ArrayList<BluetoothDevice>();
+                scan();
+            }
+        });
+
+    }
+
+    void scan(){
+
+        List<ScanFilter> filters = new ArrayList<>();
+        ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER).build();
+
+        ScanResults = new HashMap<>();
+        bluetoothScanCallback = new BLEScanCallback();
+
+        bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
+        bluetoothLeScanner.startScan(filters, settings, bluetoothScanCallback);
+
+        Handler handler = new Handler();                                                            //After 1000 ms Timeout
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+
+                bluetoothLeScanner.stopScan(bluetoothScanCallback);
+
+            }
+        }, 4000);
+
+
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        initUI();
+        initBT();
+        initLocation();
+        initReceiver();
+
+        if(!isBluetoothEnabled())
+            onBluetoothDisabled();
+
+        if(!isLocationEnabled())
+            onLocationDisabled();
     }
 
     private class BluetoothDeviceAdapter extends BaseAdapter {
@@ -263,40 +370,12 @@ public class MainActivity extends Activity {
             TextView name = (TextView) convertView.findViewById(R.id.name);
             TextView mac = (TextView)convertView.findViewById(R.id.mac);
 
-            name.setText("Test");
+            name.setText(device.getName());
             mac.setText(device.getAddress());
 
             // returns the view for the current row
             return convertView;
         }
-
-    }
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
-        initBT();
-        initUI();
-
-        /*
-        if (!initBT()) {
-
-            Toast.makeText(getApplicationContext(), "Bluetooth konnte nicht aktiviert werden oder wird nicht unterstützt...", Toast.LENGTH_SHORT).show();
-
-        }
-
-        scansrl.setOnRefreshListener(
-                new SwipeRefreshLayout.OnRefreshListener() {
-                    @Override
-                    public void onRefresh() {
-                        updateDeviceList();
-                    }
-                }
-        );
-        */
-
 
     }
 
@@ -328,7 +407,7 @@ public class MainActivity extends Activity {
             ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER).build();
 
             ScanResults = new HashMap<>();
-            final MainActivity.BLECallback blueoothScanCallback = new MainActivity.BLECallback();
+            final MainActivity.BLEScanCallback blueoothScanCallback = new MainActivity.BLEScanCallback();
 
             bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
             bluetoothLeScanner.startScan(filters, settings, blueoothScanCallback);
@@ -378,9 +457,9 @@ public class MainActivity extends Activity {
 
     }
 
-    private class BLECallback extends ScanCallback {
+    private class BLEScanCallback extends ScanCallback {
 
-        BLECallback(){}
+        BLEScanCallback(){}
 
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
@@ -404,6 +483,8 @@ public class MainActivity extends Activity {
 
             String deviceAddress = result.getDevice().getAddress();
             ScanResults.put(deviceAddress, result);
+            ((BluetoothDeviceAdapter)devicelist.getAdapter()).items.add(result.getDevice());
+            ((BaseAdapter)devicelist.getAdapter()).notifyDataSetChanged();
             Log.d("Discovered Device", ScanResults.get(deviceAddress).toString());
 
         }

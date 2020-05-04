@@ -14,13 +14,14 @@
         android:id="@+id/btwarning"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="5dp"
         android:layout_weight="0"
         android:background="#B90000"
         android:visibility="gone">
 
         <Button
             android:id="@+id/enablebluetooth"
-            android:layout_width="wrap_content"
+            android:layout_width="88dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:layout_marginTop="8dp"
@@ -36,15 +37,27 @@
             android:textColor="#058505"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="1.0"
             app:layout_constraintStart_toEndOf="@+id/btdisabled"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintVertical_bias="0.0" />
+
+        <ProgressBar
+            android:id="@+id/btenabling"
+            style="@android:style/Widget.DeviceDefault.Light.ProgressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:indeterminateTint="#FFFFFF"
+            android:visibility="invisible"
+            app:layout_constraintBottom_toBottomOf="@+id/enablebluetooth"
+            app:layout_constraintEnd_toEndOf="@+id/enablebluetooth"
+            app:layout_constraintStart_toStartOf="@+id/enablebluetooth"
+            app:layout_constraintTop_toTopOf="@+id/enablebluetooth" />
 
         <TextView
             android:id="@+id/btdisabled"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
             android:layout_marginStart="8dp"
             android:layout_marginTop="8dp"
             android:layout_marginEnd="80dp"
@@ -59,20 +72,144 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
+
     </android.support.constraint.ConstraintLayout>
 
-    <android.support.v4.widget.SwipeRefreshLayout
-        android:id="@+id/swiperefresh"
+    <android.support.constraint.ConstraintLayout
+        android:id="@+id/locationwarning"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        tools:layout_editor_absoluteX="16dp"
-        tools:layout_editor_absoluteY="16dp">
+        android:layout_marginBottom="5dp"
+        android:layout_weight="0"
+        android:background="#B90000"
+        android:visibility="gone">
 
-        <ListView
-            android:id="@+id/devicelist"
+        <Button
+            android:id="@+id/enablelocation"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="32dp"
+            android:layout_marginBottom="8dp"
+            android:layout_weight="0"
+            android:background="@drawable/roundbutton"
+            android:includeFontPadding="false"
+            android:minHeight="40dip"
+            android:padding="0dp"
+            android:text="ENABLE"
+            android:textAlignment="center"
+            android:textColor="#058505"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="1.0"
+            app:layout_constraintStart_toEndOf="@+id/locationdisabled"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="1.0" />
+
+        <TextView
+            android:id="@+id/locationdisabled"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="80dp"
+            android:layout_marginBottom="8dp"
+            android:layout_weight="0"
+            android:text="Location is disabled. "
+            android:textAlignment="center"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </android.support.constraint.ConstraintLayout>
+
+    <android.support.constraint.ConstraintLayout
+        android:id="@+id/scanarea"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_weight="0">
+
+        <android.support.constraint.ConstraintLayout
+            android:id="@+id/scanheader"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="wrap_content"
+            android:layout_weight="0"
+            android:background="#0003AA"
+            android:visibility="visible"
+            app:layout_constraintTop_toTopOf="parent">
 
-    </android.support.v4.widget.SwipeRefreshLayout>
+            <Button
+                android:id="@+id/scan"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="32dp"
+                android:layout_marginBottom="8dp"
+                android:layout_weight="0"
+                android:background="@drawable/roundbutton"
+                android:includeFontPadding="false"
+                android:minHeight="40dip"
+                android:padding="0dp"
+                android:text="SCAN"
+                android:textAlignment="center"
+                android:textColor="#058505"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintHorizontal_bias="1.0"
+                app:layout_constraintStart_toEndOf="@+id/bluetoothscan"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintVertical_bias="1.0" />
+
+            <ProgressBar
+                android:id="@+id/scanning"
+                style="@android:style/Widget.DeviceDefault.Light.ProgressBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:indeterminateTint="#FFFFFF"
+                android:visibility="invisible"
+                app:layout_constraintBottom_toBottomOf="@+id/scan"
+                app:layout_constraintEnd_toEndOf="@+id/scan"
+                app:layout_constraintStart_toStartOf="@+id/scan"
+                app:layout_constraintTop_toTopOf="@+id/scan" />
+
+            <TextView
+                android:id="@+id/bluetoothscan"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="80dp"
+                android:layout_marginBottom="8dp"
+                android:layout_weight="0"
+                android:text="Verfügbare Geräte:"
+                android:textAlignment="center"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+        </android.support.constraint.ConstraintLayout>
+
+        <android.support.v4.widget.SwipeRefreshLayout
+            android:id="@+id/swiperefresh"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@+id/scanheader"
+            tools:layout_editor_absoluteX="16dp">
+
+            <ListView
+                android:id="@+id/devicelist"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+        </android.support.v4.widget.SwipeRefreshLayout>
+    </android.support.constraint.ConstraintLayout>
 
 </LinearLayout>
