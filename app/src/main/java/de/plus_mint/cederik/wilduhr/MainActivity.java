@@ -43,7 +43,6 @@ import java.util.UUID;
 
 public class MainActivity extends Activity {
 
-    SwipeRefreshLayout scansrl;
     ListView devicelist;
     ConstraintLayout bluetoothwarning;
     TextView bluetoothdisabled;
@@ -65,7 +64,8 @@ public class MainActivity extends Activity {
 
     BroadcastReceiver receiver;
 
-    private Map<String, ScanResult> ScanResults;
+    private Map<String, ScanResult> ScanResults = new HashMap<String, ScanResult>();
+    volatile boolean Scanning = false;
 
     ArrayList<BluetoothDevice> BluetoothDevices;
 
@@ -106,7 +106,7 @@ public class MainActivity extends Activity {
 
         }
 
-        while(!bluetoothAdapter.isEnabled());
+        //while(!bluetoothAdapter.isEnabled());
 
         return true;
 
@@ -222,9 +222,27 @@ public class MainActivity extends Activity {
         hideLocationWarning();
     }
 
+    void onScanStart(){
+        Scanning = true;
+
+        doscan.setText("STOP");
+        doscan.setTextColor(getResources().getColor(R.color.errred));
+
+        scanning.setVisibility(View.VISIBLE);
+        ScanResults = new HashMap<>();
+        ((BaseAdapter)devicelist.getAdapter()).notifyDataSetChanged();
+    }
+    void onScanStop(){
+        Scanning = false;
+
+        doscan.setText("SCAN");
+        doscan.setTextColor(getResources().getColor(R.color.goodgreen));
+
+        scanning.setVisibility(View.INVISIBLE);
+    }
+
     void initUI(){
 
-        scansrl = (SwipeRefreshLayout)findViewById(R.id.swiperefresh);
         devicelist = (ListView)findViewById(R.id.devicelist);
         bluetoothwarning = (ConstraintLayout)findViewById(R.id.btwarning);
         bluetoothdisabled = (TextView) findViewById(R.id.btdisabled);
@@ -236,7 +254,7 @@ public class MainActivity extends Activity {
         doscan = (Button)findViewById(R.id.scan);
         scanning = (ProgressBar)findViewById(R.id.scanning);
 
-        devicelist.setAdapter(new BluetoothDeviceAdapter(new ArrayList<BluetoothDevice>(), this));
+        devicelist.setAdapter(new BluetoothDeviceAdapter(this));
 
         devicelist.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             public void onItemClick(AdapterView parentView, View childView,
@@ -265,37 +283,32 @@ public class MainActivity extends Activity {
         doscan.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                doscan.setVisibility(View.INVISIBLE);
-                scanning.setVisibility(View.VISIBLE);
-                (((BluetoothDeviceAdapter)devicelist.getAdapter())).items = new ArrayList<BluetoothDevice>();
-                scan();
+                if(!Scanning){
+                    startscan();
+                }
+                else{
+                    stopscan();
+                }
             }
         });
-
     }
 
-    void scan(){
+    void startscan(){
+
+        onScanStart();
 
         List<ScanFilter> filters = new ArrayList<>();
         ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER).build();
 
-        ScanResults = new HashMap<>();
         bluetoothScanCallback = new BLEScanCallback();
 
         bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
         bluetoothLeScanner.startScan(filters, settings, bluetoothScanCallback);
+    }
 
-        Handler handler = new Handler();                                                            //After 1000 ms Timeout
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-
-                bluetoothLeScanner.stopScan(bluetoothScanCallback);
-
-            }
-        }, 4000);
-
-
+    void stopscan(){
+        bluetoothLeScanner.stopScan(bluetoothScanCallback);
+        onScanStop();
     }
 
     @Override
@@ -318,27 +331,26 @@ public class MainActivity extends Activity {
     private class BluetoothDeviceAdapter extends BaseAdapter {
 
         private Context context;
-        private ArrayList<BluetoothDevice> items;
+        //private ArrayList<BluetoothDevice> items;
 
         private class ViewHolder {
             TextView name;
+            TextView rssi;
             TextView mac;
         }
 
-        public BluetoothDeviceAdapter(ArrayList<BluetoothDevice> items, Context context) {
+        public BluetoothDeviceAdapter(Context context) {
             this.context = context;
-            this.items = items;
-
         }
 
         @Override
         public int getCount() {
-            return items.size();
+            return ScanResults.values().size();
         }
 
         @Override
         public Object getItem(int position) {
-            return items.get(position);
+            return (new ArrayList<ScanResult>(ScanResults.values()).get(position)).getDevice();
         }
 
         @Override
@@ -356,6 +368,7 @@ public class MainActivity extends Activity {
                 convertView = getLayoutInflater().inflate(R.layout.devicelistentry, parent, false);
 
                 viewholder.name = (TextView) convertView.findViewById(R.id.name);
+                viewholder.rssi = (TextView) convertView.findViewById(R.id.rssi);
                 viewholder.mac = (TextView) convertView.findViewById(R.id.mac);
 
                 convertView.setTag(viewholder);
@@ -368,9 +381,11 @@ public class MainActivity extends Activity {
             BluetoothDevice device= (BluetoothDevice) getItem(position);
 
             TextView name = (TextView) convertView.findViewById(R.id.name);
+            TextView rssi =(TextView) convertView.findViewById(R.id.rssi);
             TextView mac = (TextView)convertView.findViewById(R.id.mac);
 
             name.setText(device.getName());
+            rssi.setText(ScanResults.get(device.getAddress()).getRssi() + "dBm");
             mac.setText(device.getAddress());
 
             // returns the view for the current row
@@ -481,12 +496,14 @@ public class MainActivity extends Activity {
 
         private void addResult(ScanResult result) {
 
-            String deviceAddress = result.getDevice().getAddress();
-            ScanResults.put(deviceAddress, result);
-            ((BluetoothDeviceAdapter)devicelist.getAdapter()).items.add(result.getDevice());
-            ((BaseAdapter)devicelist.getAdapter()).notifyDataSetChanged();
-            Log.d("Discovered Device", ScanResults.get(deviceAddress).toString());
+            if(result.getDevice().getName() != null) {
 
+                String deviceAddress = result.getDevice().getAddress();
+                ScanResults.put(deviceAddress, result);
+                ((BaseAdapter) devicelist.getAdapter()).notifyDataSetChanged();
+                Log.d("Discovered Device", ScanResults.get(deviceAddress).toString());
+
+            }
         }
     };
 
