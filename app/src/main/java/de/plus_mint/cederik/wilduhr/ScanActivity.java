@@ -20,9 +20,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.AsyncTask;
-import android.os.Handler;
 import android.support.constraint.ConstraintLayout;
-import android.support.v4.widget.SwipeRefreshLayout;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -39,9 +37,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
-public class MainActivity extends Activity {
+public class ScanActivity extends Activity {
 
     ListView devicelist;
     ConstraintLayout bluetoothwarning;
@@ -53,6 +50,7 @@ public class MainActivity extends Activity {
     Button enablelocation;
     Button doscan;
     ProgressBar scanning;
+    ConstraintLayout scanheader;
 
 
     LocationManager locationManager;
@@ -66,8 +64,6 @@ public class MainActivity extends Activity {
 
     private Map<String, ScanResult> ScanResults = new HashMap<String, ScanResult>();
     volatile boolean Scanning = false;
-
-    ArrayList<BluetoothDevice> BluetoothDevices;
 
     BluetoothDevice Wilduhr;
 
@@ -206,21 +202,40 @@ public class MainActivity extends Activity {
         locationwarning.setVisibility(View.GONE);
     }
 
-    void onBluetoothDisabled(){
-        showBTWarning();
+    void showScanHeader(){
+        scanheader.setVisibility(View.VISIBLE);
+    }
+    void hideScanHeader(){
+        scanheader.setVisibility(View.INVISIBLE);
     }
 
+    void onBluetoothDisabled(){
+        showBTWarning();
+        onEssentialsDisabled();
+    }
     void onBluetoothEnabled(){
         hideBTWarning();
+        onEssentialsEnabled();
     }
 
     void onLocationDisabled(){
         showLocationWarning();
+        onEssentialsDisabled();
     }
-
     void onLocationEnabled(){
         hideLocationWarning();
+        onEssentialsEnabled();
     }
+
+    void onEssentialsEnabled(){
+        if(isBluetoothEnabled() && isLocationEnabled())
+            showScanHeader();
+    }
+    void onEssentialsDisabled(){
+        if(!isBluetoothEnabled() || !isLocationEnabled())
+            hideScanHeader();
+    }
+
 
     void onScanStart(){
         Scanning = true;
@@ -251,6 +266,7 @@ public class MainActivity extends Activity {
         locationwarning = (ConstraintLayout)findViewById(R.id.locationwarning);
         locationdisabled = (TextView) findViewById(R.id.locationdisabled);
         enablelocation = (Button)findViewById(R.id.enablelocation);
+        scanheader = (ConstraintLayout)findViewById(R.id.scanheader);
         doscan = (Button)findViewById(R.id.scan);
         scanning = (ProgressBar)findViewById(R.id.scanning);
 
@@ -260,7 +276,11 @@ public class MainActivity extends Activity {
             public void onItemClick(AdapterView parentView, View childView,
                                        int position, long id)
             {
-                Log.d("onItemClick", String.valueOf(position));
+                Log.d("onDeviceChosen", ((BluetoothDevice)devicelist.getAdapter().getItem(position)).toString());
+
+                stopscan();
+
+                startMainMenu((BluetoothDevice)devicelist.getAdapter().getItem(position));
             }
 
         });
@@ -305,10 +325,17 @@ public class MainActivity extends Activity {
         bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
         bluetoothLeScanner.startScan(filters, settings, bluetoothScanCallback);
     }
-
     void stopscan(){
         bluetoothLeScanner.stopScan(bluetoothScanCallback);
         onScanStop();
+    }
+
+    void startMainMenu(BluetoothDevice device){
+        Log.d("BTDevice", device.toString());
+
+        Intent intent = new Intent(this, WilduhrMenuActivity.class);
+        intent.putExtra("Wilduhr", device);
+        startActivity(intent);
     }
 
     @Override
@@ -326,6 +353,10 @@ public class MainActivity extends Activity {
 
         if(!isLocationEnabled())
             onLocationDisabled();
+
+        if(isBluetoothEnabled() && isLocationEnabled())
+            onEssentialsEnabled();
+
     }
 
     private class BluetoothDeviceAdapter extends BaseAdapter {
@@ -422,7 +453,7 @@ public class MainActivity extends Activity {
             ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER).build();
 
             ScanResults = new HashMap<>();
-            final MainActivity.BLEScanCallback blueoothScanCallback = new MainActivity.BLEScanCallback();
+            final ScanActivity.BLEScanCallback blueoothScanCallback = new ScanActivity.BLEScanCallback();
 
             bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
             bluetoothLeScanner.startScan(filters, settings, blueoothScanCallback);

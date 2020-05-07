@@ -7,7 +7,7 @@
     android:layout_height="match_parent"
     android:layout_gravity="center_vertical"
     android:orientation="vertical"
-    tools:context=".MainActivity">
+    tools:context=".ScanActivity">
 
 
     <android.support.constraint.ConstraintLayout
@@ -139,7 +139,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="0"
             android:background="@color/neutralblue"
-            android:visibility="visible"
+            android:visibility="gone"
+            app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
             <Button
