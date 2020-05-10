@@ -180,6 +180,11 @@ public class ScanActivity extends Activity {
 
         this.registerReceiver(receiver, filter);
     }
+    void deinitReceiver(){
+
+        this.unregisterReceiver(receiver);
+
+    }
 
     void showBTWarning(){
         bluetoothwarning.setVisibility(View.VISIBLE);
@@ -357,6 +362,12 @@ public class ScanActivity extends Activity {
         if(isBluetoothEnabled() && isLocationEnabled())
             onEssentialsEnabled();
 
+    }
+
+    @Override
+    protected void onStop(){
+        super.onStop();
+        deinitReceiver();
     }
 
     private class BluetoothDeviceAdapter extends BaseAdapter {

@@ -4,11 +4,18 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
+import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
 
+import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,13 +23,43 @@ public class WilduhrMenuActivity extends AppCompatActivity {
 
     Wilduhr wu;
 
+    TextView devicename;
+    Button disconnect;
+    Button getinfo;
+
+    void initUI(){
+        devicename = (TextView)findViewById(R.id.devicename);
+        disconnect = (Button)findViewById(R.id.disconnect);
+        getinfo = (Button)findViewById(R.id.getinfo);
+
+        disconnect.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                wu.disconnect();
+                finish();
+            }
+        });
+
+        getinfo.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+            }
+        });
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_wilduhr_menu);
 
+        initUI();
+
         wu = new Wilduhr((BluetoothDevice)getIntent().getParcelableExtra("Wilduhr"));
         wu.connect();
+
+        devicename.setText(wu.getName());
+
     }
 
     class Wilduhr extends BluetoothGattCallback{
@@ -30,6 +67,7 @@ public class WilduhrMenuActivity extends AppCompatActivity {
         final UUID WU_SERVICE =             UUID.fromString("00002020-9CBF-4F73-A92F-DAD011379CA9");
         final UUID WU_CMD_CHARACTERISTIC =  UUID.fromString("00002021-9CBF-4F73-A92F-DAD011379CA9");
         final UUID WU_DATA_CHARACTERISTIC = UUID.fromString("00002022-9CBF-4F73-A92F-DAD011379CA9");
+        final UUID CHARACTERISTIC_UPDATE_NOTIFICATION_DESCRIPTOR_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
 
         final byte WU_CMD_ACK = 0x00;
         final byte WU_CMD_GET_VERSION = 0x01;
@@ -49,74 +87,87 @@ public class WilduhrMenuActivity extends AppCompatActivity {
         BluetoothGattCharacteristic DATA;
         List<BluetoothGattService> serviceList;
 
-        volatile boolean cmd_ready = false;
-        volatile boolean data_ready = false;
+        volatile boolean deviceReady = false;
+        volatile boolean dataAvailable = false;
 
         Wilduhr(BluetoothDevice device){
             bleDevice = device;
         }
 
+        void awaitCompletion(){
+            Log.d("Wilduhr", "Waiting for deviceReady...");
+            while(!deviceReady);
+            Log.d("Wilduhr", "Device is ready.");
+        }
+
         boolean connect(){
 
             bleGATT = bleDevice.connectGatt(getApplicationContext(), false, this);
+            awaitCompletion();
             return (bleGATT != null);
         }
         void disconnect(){
             bleGATT.disconnect();
         }
 
-        boolean writeCMD(byte[] val){
+        void writeCMD(byte[] val){
 
-            cmd_ready = false;
+            awaitCompletion();
+
+            deviceReady = false;
+
             CMD.setValue(val);
-            bleGATT.writeCharacteristic(CMD);
+            Log.d("Wilduhr.writeCMD", "Characteristic Value: " + Arrays.toString(val));
+            CMD.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+            if(!bleGATT.writeCharacteristic(CMD)){
+                Log.e("Wilduhr.writeCMD", "Failed!");
+                return;
+            }
+
+            awaitCompletion();
+
             Log.d("Wilduhr.writeCMD", "Wrote Characteristic.");
-            long startTime = System.currentTimeMillis();
-            //while(!cmd_ready || (System.currentTimeMillis() - startTime) < 1000);
-            return cmd_ready;
             
         }
         byte[] readDATA(){
-
-            long startTime = System.currentTimeMillis();
-            while(!data_ready || (System.currentTimeMillis() - startTime) < 1000);
-            if(data_ready)
-                return DATA.getValue();
-            else
-                return null;
-
+            awaitCompletion();
+            while(!dataAvailable);
+            Log.d("Wilduhr.readDATA", "Data available!");
+            dataAvailable = false;
+            return DATA.getValue();
         }
 
+        String getName(){return bleDevice.getName();}
         String getVersion(){
             Log.d("Wilduhr", "getVersion");
-            if(cmd_ready){
-                final byte[] GET_VERSION = new byte[]{WU_CMD_GET_VERSION};
 
-                writeCMD(GET_VERSION);
-                byte[] response = readDATA();
+            final byte[] GET_VERSION = new byte[]{WU_CMD_GET_VERSION};
 
-                Log.d("Wilduhr.getVersion", response.toString());
+            writeCMD(GET_VERSION);
+            byte[] response = readDATA();
+            if(response != null) {
 
-                return new String(response);
+                Log.d("Wilduhr.getVersion", new String(response).trim());
+
+                return new String(response).trim();
             }
-            else{
+            else
                 return null;
-            }
         }
 
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
 
             if (newState == BluetoothGatt.STATE_CONNECTED) {
-                Log.d("Wilduhr", "Connected");
+                Log.d("Wilduhr", "Connected " + String.valueOf(gatt == bleGATT));
 
-                gatt.discoverServices();
+                bleGATT.discoverServices();
                 Log.d("Wilduhr", "Discovering Services...");
             }
             else if(newState==BluetoothGatt.STATE_DISCONNECTED){
 
                 Log.d("Wilduhr", "Disconnected");
-                cmd_ready = false;
+                deviceReady = false;
 
             }
 
@@ -131,36 +182,35 @@ public class WilduhrMenuActivity extends AppCompatActivity {
 
             CMD = gatt.getService(WU_SERVICE).getCharacteristic(WU_CMD_CHARACTERISTIC);
             DATA = gatt.getService(WU_SERVICE).getCharacteristic(WU_DATA_CHARACTERISTIC);
-            gatt.setCharacteristicNotification(DATA, true);
 
-            cmd_ready = true;
-            getVersion();
+            gatt.setCharacteristicNotification(DATA, true);
+            BluetoothGattDescriptor descriptor = DATA.getDescriptor(CHARACTERISTIC_UPDATE_NOTIFICATION_DESCRIPTOR_UUID);
+            descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);;
+            bleGATT.writeDescriptor(descriptor);
+
+            deviceReady = true;
 
         }
 
         @Override
         public void onCharacteristicChanged (BluetoothGatt gatt, BluetoothGattCharacteristic characteristic){
-
             gatt.readCharacteristic(characteristic);
-            Log.d("onCharacteristicChanged", characteristic.getValue().toString());
-
-            if(characteristic == DATA)
-                data_ready = true;
-
+            Log.d("onCharacteristicChanged", String.valueOf(characteristic.getValue().length)+" bytes");
+            dataAvailable = true;
         }
 
         @Override
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status){
             Log.d("OnCharacteristicWrite", String.valueOf(status));
             if(status == BluetoothGatt.GATT_SUCCESS)
-                cmd_ready = true;
+                deviceReady = true;
         }
 
         @Override
         public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status){
             Log.d("OnCharacteristicRead", String.valueOf(status));
             if(status == BluetoothGatt.GATT_SUCCESS)
-                cmd_ready = true;
+                deviceReady = true;
         }
 
     };
